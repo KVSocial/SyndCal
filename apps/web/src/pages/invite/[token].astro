@@ -1,0 +1,32 @@
+---
+import Base from "../../layouts/Base.astro";
+const { token } = Astro.params;
+---
+<Base title="Accept invite">
+  <div class="card max-w-md">
+    <h1 class="text-2xl font-semibold">Accept invite</h1>
+    <form class="mt-4 space-y-3" id="acceptForm">
+      <input class="input" name="name" placeholder="Name" />
+      <input class="input" name="email" placeholder="Email" />
+      <input class="input" name="password" type="password" placeholder="Password" />
+      <button class="btn w-full" type="submit">Join</button>
+      <p class="text-sm text-slate-400" id="message"></p>
+    </form>
+  </div>
+  <script type="module">
+    import { api } from "../../lib/api.ts";
+    const form = document.getElementById("acceptForm");
+    const message = document.getElementById("message");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form));
+      data.token = "${token}";
+      try {
+        await api.acceptInvite(data);
+        message.textContent = "Invite accepted";
+      } catch (err) {
+        message.textContent = err.message;
+      }
+    });
+  </script>
+</Base>

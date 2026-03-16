@@ -1,0 +1,58 @@
+---
+import Protected from "../layouts/Protected.astro";
+---
+<Protected title="Syndicates">
+  <section class="grid gap-6 md:grid-cols-2">
+    <div class="card">
+      <h2 class="text-xl font-semibold">Create syndicate</h2>
+      <form class="mt-4 space-y-3" id="createForm" method="POST" action="#">
+        <input class="input" name="name" placeholder="Name" />
+        <input class="input" name="slug" placeholder="Slug" />
+        <button class="btn w-full" type="submit">Create</button>
+        <p class="text-sm text-slate-400" id="createMessage"></p>
+      </form>
+    </div>
+    <div class="card">
+      <h2 class="text-xl font-semibold">Your syndicates</h2>
+      <ul class="mt-3 space-y-2" id="syndicateList"></ul>
+    </div>
+  </section>
+  <script type="module">
+    import { api } from "../lib/api.ts";
+    const list = document.getElementById("syndicateList");
+    const createForm = document.getElementById("createForm");
+    const createMessage = document.getElementById("createMessage");
+
+    async function load() {
+      try {
+        const data = await api.listSyndicates();
+        list.textContent = "";
+        data.forEach((s) => {
+          const li = document.createElement("li");
+          const link = document.createElement("a");
+          link.className = "text-indigo-300";
+          link.href = `/syndicates/${s.id}`;
+          link.textContent = s.name;
+          li.appendChild(link);
+          list.appendChild(li);
+        });
+      } catch (e) {
+        list.textContent = "Login required";
+      }
+    }
+
+    createForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(createForm));
+      try {
+        await api.createSyndicate(data);
+        createMessage.textContent = "Created";
+        load();
+      } catch (err) {
+        createMessage.textContent = err.message;
+      }
+    });
+
+    load();
+  </script>
+</Protected>

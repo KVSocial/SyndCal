@@ -1,0 +1,190 @@
+---
+import Protected from "../layouts/Protected.astro";
+---
+<Protected title="JVZoo Settings">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">JVZoo Integration</h1>
+    
+    <div class="card">
+      <div id="statusMessage" class="mb-4 p-3 rounded hidden"></div>
+      
+      <form id="jvzooForm" class="space-y-4" method="POST" action="#">
+        <div>
+          <label class="block text-sm font-medium mb-2" for="apiKey">
+            JVZoo API Key
+          </label>
+          <input
+            type="password"
+            id="apiKey"
+            name="apiKey"
+            class="input w-full"
+            placeholder="Enter your JVZoo API key"
+          />
+          <p class="text-sm text-slate-400 mt-1">
+            Get your API key from your JVZoo account settings
+          </p>
+        </div>
+        
+        <button type="submit" class="btn" id="saveBtn">
+          Save & Verify
+        </button>
+      </form>
+
+      <div id="credentialsStatus" class="mt-6 hidden">
+        <div class="border-t border-slate-700 pt-4">
+          <h3 class="font-semibold mb-2">Current Status</h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span>API Key:</span>
+              <span id="apiKeyStatus" class="font-mono"></span>
+            </div>
+            <div class="flex justify-between">
+              <span>Verified:</span>
+              <span id="verifiedStatus"></span>
+            </div>
+            <div class="flex justify-between" id="verifiedDateRow">
+              <span>Verified At:</span>
+              <span id="verifiedDate"></span>
+            </div>
+          </div>
+          
+          <button
+            type="button"
+            class="btn btn-danger mt-4"
+            id="deleteBtn"
+          >
+            Remove API Key
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-6 border-t border-slate-700 pt-4">
+        <h3 class="font-semibold mb-2">Manual Import</h3>
+        <p class="text-sm text-slate-400 mb-3">
+          Trigger a manual import of your JVZoo transactions (for testing)
+        </p>
+        <button
+          type="button"
+          class="btn btn-secondary"
+          id="importBtn"
+        >
+          Import Transactions Now
+        </button>
+        <p class="text-sm text-slate-400 mt-2" id="importMessage"></p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { api } from "../lib/api.ts";
+
+    const jvzooForm = document.getElementById("jvzooForm");
+    const apiKeyInput = document.getElementById("apiKey");
+    const saveBtn = document.getElementById("saveBtn");
+    const deleteBtn = document.getElementById("deleteBtn");
+    const importBtn = document.getElementById("importBtn");
+    const statusMessage = document.getElementById("statusMessage");
+    const credentialsStatus = document.getElementById("credentialsStatus");
+    const apiKeyStatus = document.getElementById("apiKeyStatus");
+    const verifiedStatus = document.getElementById("verifiedStatus");
+    const verifiedDate = document.getElementById("verifiedDate");
+    const verifiedDateRow = document.getElementById("verifiedDateRow");
+    const importMessage = document.getElementById("importMessage");
+
+    function showStatus(message, type) {
+      statusMessage.textContent = message;
+      statusMessage.className = `mb-4 p-3 rounded ${
+        type === "error" ? "bg-red-900/50 text-red-200" : "bg-green-900/50 text-green-200"
+      }`;
+      statusMessage.classList.remove("hidden");
+    }
+
+    async function loadCredentials() {
+      try {
+        const creds = await api.getJvzooCredentials();
+        
+        if (creds.configured) {
+          credentialsStatus.classList.remove("hidden");
+          apiKeyStatus.textContent = creds.apiKeyPrefix || "Configured";
+          verifiedStatus.textContent = creds.verified ? "✓ Yes" : "✗ No";
+          verifiedStatus.className = creds.verified ? "text-green-400" : "text-red-400";
+          
+          if (creds.verifiedAt) {
+            verifiedDate.textContent = new Date(creds.verifiedAt).toLocaleDateString();
+            verifiedDateRow.classList.remove("hidden");
+          } else {
+            verifiedDateRow.classList.add("hidden");
+          }
+          
+          if (creds.verificationError) {
+            showStatus(`Verification failed: ${creds.verificationError}`, "error");
+          }
+        } else {
+          credentialsStatus.classList.add("hidden");
+        }
+      } catch (err) {
+        console.error("Failed to load credentials:", err);
+      }
+    }
+
+    jvzooForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const apiKey = apiKeyInput.value.trim();
+      
+      if (!apiKey) {
+        showStatus("Please enter an API key", "error");
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Verifying...";
+
+      try {
+        await api.saveJvzooCredentials({ apiKey });
+        showStatus("API key saved and verified successfully!", "success");
+        apiKeyInput.value = "";
+        await loadCredentials();
+      } catch (err) {
+        showStatus(err.message || "Verification failed", "error");
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save & Verify";
+      }
+    });
+
+    deleteBtn.addEventListener("click", async () => {
+      if (!confirm("Are you sure you want to remove your JVZoo API key?")) {
+        return;
+      }
+
+      try {
+        await api.deleteJvzooCredentials();
+        showStatus("API key removed", "success");
+        credentialsStatus.classList.add("hidden");
+      } catch (err) {
+        showStatus("Failed to remove API key", "error");
+      }
+    });
+
+    importBtn.addEventListener("click", async () => {
+      importBtn.disabled = true;
+      importBtn.textContent = "Importing...";
+      importMessage.textContent = "";
+
+      try {
+        const result = await api.importJvzooTransactions();
+        importMessage.textContent = `Imported ${result.imported} transactions, skipped ${result.skipped} (duplicates)`;
+        importMessage.className = "text-sm text-green-400 mt-2";
+      } catch (err) {
+        importMessage.textContent = err.message || "Import failed";
+        importMessage.className = "text-sm text-red-400 mt-2";
+      } finally {
+        importBtn.disabled = false;
+        importBtn.textContent = "Import Transactions Now";
+      }
+    });
+
+    // Load initial state
+    loadCredentials();
+  </script>
+</Protected>

@@ -1,0 +1,182 @@
+---
+import Protected from "../../../layouts/Protected.astro";
+const { id } = Astro.params;
+---
+<Protected title="Leaderboard">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold">Leaderboard</h1>
+      <a href="/syndicate/{id}" class="text-sm text-slate-400 hover:text-white">
+        ← Back to Syndicate
+      </a>
+    </div>
+
+    <div class="card mb-6">
+      <div class="flex flex-wrap gap-3 items-center justify-between">
+        <div class="flex gap-2">
+          <button class="btn btn-sm" data-filter="all">All Time</button>
+          <button class="btn btn-sm btn-secondary" data-filter="month">This Month</button>
+          <button class="btn btn-sm btn-secondary" data-filter="year">This Year</button>
+        </div>
+        <div class="text-sm text-slate-400">
+          Ranking by: <span id="metricLabel" class="text-white font-medium">Sales</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="loadingState" class="text-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
+        <p class="mt-2 text-slate-400">Loading leaderboard...</p>
+      </div>
+
+      <table id="leaderboardTable" class="w-full hidden">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="text-left py-3 px-4">Rank</th>
+            <th class="text-left py-3 px-4">Member</th>
+            <th class="text-right py-3 px-4" id="salesHeader">Sales</th>
+            <th class="text-right py-3 px-4" id="revenueHeader">Revenue</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboardBody">
+        </tbody>
+      </table>
+
+      <div id="currentUserRank" class="mt-4 pt-4 border-t border-slate-700 hidden">
+        <p class="text-sm text-slate-400">
+          Your position: <span id="yourRank" class="text-white font-medium"></span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { api } from "../../../lib/api.ts";
+
+    const syndicateId = "${id}";
+    const filterButtons = document.querySelectorAll("[data-filter]");
+    const leaderboardTable = document.getElementById("leaderboardTable");
+    const leaderboardBody = document.getElementById("leaderboardBody");
+    const loadingState = document.getElementById("loadingState");
+    const currentUserRank = document.getElementById("currentUserRank");
+    const yourRank = document.getElementById("yourRank");
+    const metricLabel = document.getElementById("metricLabel");
+    const salesHeader = document.getElementById("salesHeader");
+    const revenueHeader = document.getElementById("revenueHeader");
+
+    let currentFilter = "all";
+    let currentSettings = null;
+
+    function updateFilterButtons() {
+      filterButtons.forEach(btn => {
+        if (btn.dataset.filter === currentFilter) {
+          btn.classList.remove("btn-secondary");
+          btn.classList.add("btn");
+        } else {
+          btn.classList.add("btn-secondary");
+          btn.classList.remove("btn");
+        }
+      });
+    }
+
+    async function loadLeaderboard() {
+      loadingState.classList.remove("hidden");
+      leaderboardTable.classList.add("hidden");
+      currentUserRank.classList.add("hidden");
+
+      try {
+        const data = await api.getLeaderboard(syndicateId, currentFilter);
+        currentSettings = data.settings;
+
+        // Update metric label
+        metricLabel.textContent = data.settings.metric === "revenue" ? "Revenue" : "Sales";
+
+        // Update headers visibility
+        if (data.settings.showSalesCount) {
+          salesHeader.classList.remove("hidden");
+        } else {
+          salesHeader.classList.add("hidden");
+        }
+
+        if (data.settings.showRevenue) {
+          revenueHeader.classList.remove("hidden");
+        } else {
+          revenueHeader.classList.add("hidden");
+        }
+
+        // Render leaderboard
+        leaderboardBody.textContent = "";
+        data.leaderboard.forEach((entry) => {
+          const row = document.createElement("tr");
+          row.className = `border-b border-slate-800 ${entry.rank === data.currentUserRank ? "bg-blue-900/20" : ""}`;
+
+          const rankCell = document.createElement("td");
+          rankCell.className = "py-3 px-4";
+          if (entry.rank === 1) {
+            rankCell.textContent = "🥇";
+          } else if (entry.rank === 2) {
+            rankCell.textContent = "🥈";
+          } else if (entry.rank === 3) {
+            rankCell.textContent = "🥉";
+          } else {
+            rankCell.textContent = `#${entry.rank}`;
+          }
+
+          const nameCell = document.createElement("td");
+          nameCell.className = "py-3 px-4";
+          const nameSpan = document.createElement("span");
+          nameSpan.textContent = entry.name;
+          nameCell.appendChild(nameSpan);
+          if (entry.rank === data.currentUserRank) {
+            const youSpan = document.createElement("span");
+            youSpan.className = "text-xs text-blue-400 ml-2";
+            youSpan.textContent = "(You)";
+            nameCell.appendChild(youSpan);
+          }
+
+          row.appendChild(rankCell);
+          row.appendChild(nameCell);
+
+          if (data.settings.showSalesCount) {
+            const salesCell = document.createElement("td");
+            salesCell.className = "text-right py-3 px-4 font-mono";
+            salesCell.textContent = String(entry.salesCount);
+            row.appendChild(salesCell);
+          }
+
+          if (data.settings.showRevenue) {
+            const revenueCell = document.createElement("td");
+            revenueCell.className = "text-right py-3 px-4 font-mono";
+            revenueCell.textContent = `$${Number(entry.totalRevenue).toFixed(2)}`;
+            row.appendChild(revenueCell);
+          }
+
+          leaderboardBody.appendChild(row);
+        });
+
+        // Show current user rank
+        if (data.currentUserRank) {
+          yourRank.textContent = `#${data.currentUserRank}`;
+          currentUserRank.classList.remove("hidden");
+        }
+
+        loadingState.classList.add("hidden");
+        leaderboardTable.classList.remove("hidden");
+      } catch (err) {
+        loadingState.textContent = `Failed to load leaderboard: ${err.message}`;
+      }
+    }
+
+    filterButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        currentFilter = btn.dataset.filter;
+        updateFilterButtons();
+        loadLeaderboard();
+      });
+    });
+
+    // Initial load
+    loadLeaderboard();
+  </script>
+</Protected>

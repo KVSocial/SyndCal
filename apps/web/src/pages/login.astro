@@ -1,0 +1,85 @@
+---
+import Base from "../layouts/Base.astro";
+const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
+---
+<Base title="Login">
+  <div class="max-w-md">
+    <h1 class="text-2xl font-semibold">Login</h1>
+    <form class="mt-6 space-y-3" id="loginForm" method="POST" action="#">
+      <input class="input" name="email" placeholder="Email" type="email" required autocomplete="email" />
+      <input class="input" name="password" placeholder="Password" type="password" required autocomplete="current-password" />
+      <button class="btn w-full" type="submit" id="submitBtn">Login</button>
+      <p class="text-sm text-slate-400" id="message"></p>
+    </form>
+    <p class="mt-4 text-sm text-slate-400">
+      Don't have an account? <a href="/register" class="text-indigo-400 hover:underline">Register</a>
+      <span class="mx-2">|</span>
+      <a href="/forgot-password" class="text-indigo-400 hover:underline">Forgot password?</a>
+    </p>
+  </div>
+  <script define:vars={{ API_BASE }}>
+    const form = document.getElementById("loginForm");
+    const message = document.getElementById("message");
+    const submitBtn = document.getElementById("submitBtn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(form);
+      const data = {
+        email: formData.get("email"),
+        password: formData.get("password"),
+      };
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Logging in...";
+      message.textContent = "";
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(data),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "Login failed");
+        if (result.csrfToken) {
+          localStorage.setItem("csrfToken", result.csrfToken);
+        }
+        window.location.href = "/dashboard";
+      } catch (err) {
+        message.textContent = err.message;
+        message.className = "text-sm text-red-400";
+        
+        // Show resend link for unverified emails
+        if (err.message.toLowerCase().includes("not verified")) {
+          const resendLink = document.createElement("a");
+          resendLink.href = "#";
+          resendLink.className = "block mt-2 text-indigo-400 hover:underline text-sm";
+          resendLink.textContent = "Resend verification email";
+          resendLink.onclick = async (e) => {
+            e.preventDefault();
+            resendLink.textContent = "Sending...";
+            try {
+              const r = await fetch(`${API_BASE}/api/v1/auth/resend-verification`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ email: data.email }),
+              });
+              resendLink.textContent = "Sent! Check your inbox.";
+              resendLink.className = "block mt-2 text-green-400 text-sm";
+            } catch {
+              resendLink.textContent = "Failed. Try again later.";
+            }
+          };
+          message.after(resendLink);
+        }
+        
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Login";
+      }
+    });
+  </script>
+</Base>

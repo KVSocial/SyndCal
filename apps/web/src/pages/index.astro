@@ -1,0 +1,23 @@
+---
+import Base from "../layouts/Base.astro";
+---
+<Base title="SyndCal">
+  <section class="grid gap-8 md:grid-cols-2">
+    <div>
+      <h1 class="text-4xl font-semibold">Syndicate calendar for launch reservations</h1>
+      <p class="mt-4 text-slate-300">Book launch windows without overlap. Invite your syndicate, reserve up to 7 days, up to 3 months out.</p>
+      <div class="mt-6 flex gap-3">
+        <a class="btn" href="/register">Get started</a>
+        <a class="btn bg-slate-800 hover:bg-slate-700" href="/login">Login</a>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="text-lg font-semibold">How it works</h3>
+      <ul class="mt-3 space-y-2 text-slate-300">
+        <li>• Create a syndicate and invite members</li>
+        <li>• Reserve launch windows on a shared calendar</li>
+        <li>• No overlap, max 7 days, max 3 months ahead</li>
+      </ul>
+    </div>
+  </section>
+</Base>

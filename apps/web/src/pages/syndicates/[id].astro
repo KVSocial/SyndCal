@@ -1,0 +1,175 @@
+---
+import Protected from "../../layouts/Protected.astro";
+const { id } = Astro.params;
+---
+<Protected title="Syndicate">
+  <div class="grid gap-6">
+    <div class="card">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">Leaderboard Settings</h2>
+        <a href="/syndicate/{id}/leaderboard" class="btn btn-sm">View Leaderboard</a>
+      </div>
+      <div id="leaderSettingsPanel" class="hidden">
+        <form id="leaderSettingsForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-2">Ranking Metric</label>
+            <select id="leaderboardMetric" class="input w-full">
+              <option value="sales">Number of sales</option>
+              <option value="revenue">Revenue generated</option>
+            </select>
+          </div>
+          <div class="space-y-2">
+            <label class="flex items-center gap-2">
+              <input type="checkbox" id="showSalesCount" class="rounded" />
+              <span class="text-sm">Show number of sales</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input type="checkbox" id="showRevenue" class="rounded" />
+              <span class="text-sm">Show revenue amount</span>
+            </label>
+          </div>
+          <button type="submit" class="btn">Save Settings</button>
+          <p class="text-sm text-slate-400" id="settingsMessage"></p>
+        </form>
+      </div>
+      <p id="notLeaderMessage" class="text-sm text-slate-400 hidden">
+        Only syndicate leaders can configure leaderboard settings.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2 class="text-xl font-semibold">Invites</h2>
+      <form class="mt-4 space-y-3" id="inviteForm">
+        <input class="input" name="name" placeholder="Name" />
+        <input class="input" name="email" placeholder="Email" />
+        <input class="input" name="message" placeholder="Message" />
+        <button class="btn" type="submit">Send invite</button>
+        <p class="text-sm text-slate-400" id="inviteMessage"></p>
+      </form>
+      <ul class="mt-3 space-y-2" id="inviteList"></ul>
+    </div>
+    <div class="card">
+      <h2 class="text-xl font-semibold">Calendar</h2>
+      <div id="calendar"></div>
+      <form class="mt-4 grid gap-3 md:grid-cols-3" id="reservationForm">
+        <input class="input" name="title" placeholder="Launch name" />
+        <input class="input" name="startDate" type="date" />
+        <input class="input" name="endDate" type="date" />
+        <button class="btn md:col-span-3" type="submit">Reserve</button>
+        <p class="text-sm text-slate-400 md:col-span-3" id="reservationMessage"></p>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { api } from "../../lib/api.ts";
+    import { Calendar } from "@fullcalendar/core";
+    import dayGridPlugin from "@fullcalendar/daygrid";
+    import interactionPlugin from "@fullcalendar/interaction";
+
+    const syndicateId = "${id}";
+    const leaderSettingsPanel = document.getElementById("leaderSettingsPanel");
+    const notLeaderMessage = document.getElementById("notLeaderMessage");
+    const leaderSettingsForm = document.getElementById("leaderSettingsForm");
+    const leaderboardMetric = document.getElementById("leaderboardMetric");
+    const showSalesCount = document.getElementById("showSalesCount");
+    const showRevenue = document.getElementById("showRevenue");
+    const settingsMessage = document.getElementById("settingsMessage");
+    const inviteList = document.getElementById("inviteList");
+    const inviteForm = document.getElementById("inviteForm");
+    const inviteMessage = document.getElementById("inviteMessage");
+    const reservationForm = document.getElementById("reservationForm");
+    const reservationMessage = document.getElementById("reservationMessage");
+
+    async function loadLeaderSettings() {
+      try {
+        const settings = await api.getSyndicateSettings(syndicateId);
+        leaderSettingsPanel.classList.remove("hidden");
+        notLeaderMessage.classList.add("hidden");
+        
+        leaderboardMetric.value = settings.leaderboardMetric || "sales";
+        showSalesCount.checked = settings.showSalesCount ?? true;
+        showRevenue.checked = settings.showRevenue ?? true;
+      } catch (err) {
+        leaderSettingsPanel.classList.add("hidden");
+        notLeaderMessage.classList.remove("hidden");
+      }
+    }
+
+    leaderSettingsForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = {
+        leaderboardMetric: leaderboardMetric.value,
+        showSalesCount: showSalesCount.checked,
+        showRevenue: showRevenue.checked,
+      };
+
+      try {
+        await api.updateSyndicateSettings(syndicateId, data);
+        settingsMessage.textContent = "Settings saved";
+        settingsMessage.className = "text-sm text-green-400 mt-2";
+      } catch (err) {
+        settingsMessage.textContent = err.message;
+        settingsMessage.className = "text-sm text-red-400 mt-2";
+      }
+    });
+
+    async function loadInvites() {
+      try {
+        const invites = await api.listInvites(syndicateId);
+        inviteList.textContent = "";
+        invites.forEach((invite) => {
+          const li = document.createElement("li");
+          li.textContent = `${invite.invitedEmail} - ${invite.status}`;
+          inviteList.appendChild(li);
+        });
+      } catch (err) {
+        inviteList.textContent = "Leader access required";
+      }
+    }
+
+    async function loadCalendar() {
+      const reservations = await api.listReservations(syndicateId);
+      const events = reservations.map((r) => ({
+        title: r.title,
+        start: r.startDate,
+        end: r.endDate,
+      }));
+      const cal = new Calendar(document.getElementById("calendar"), {
+        plugins: [dayGridPlugin, interactionPlugin],
+        initialView: "dayGridMonth",
+        height: "auto",
+        events,
+      });
+      cal.render();
+    }
+
+    inviteForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(inviteForm));
+      try {
+        await api.createInvite(syndicateId, data);
+        inviteMessage.textContent = "Invite sent";
+        loadInvites();
+      } catch (err) {
+        inviteMessage.textContent = err.message;
+      }
+    });
+
+    reservationForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(reservationForm));
+      try {
+        await api.createReservation(syndicateId, data);
+        reservationMessage.textContent = "Reserved";
+        loadCalendar();
+      } catch (err) {
+        reservationMessage.textContent = err.message;
+      }
+    });
+
+    loadLeaderSettings();
+    loadInvites();
+    loadCalendar();
+  </script>
+</Protected>

@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment files (contains secrets)
+.env
+.env.*
+!.env.example
+
+# Database files
+*.db
+*.db-journal
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+.pm2/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Credentials (never commit these)
+credentials/
+*.pem
+*.key

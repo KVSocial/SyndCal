@@ -1,0 +1,57 @@
+---
+import Base from "../layouts/Base.astro";
+const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
+---
+<Base title="Register">
+  <div class="max-w-md">
+    <h1 class="text-2xl font-semibold">Create account</h1>
+    <form class="mt-6 space-y-3" id="registerForm" method="POST" action="#">
+      <input class="input" name="name" placeholder="Name" required autocomplete="name" />
+      <input class="input" name="email" placeholder="Email" type="email" required autocomplete="email" />
+      <input class="input" name="password" placeholder="Password (min 8 characters)" type="password" required minlength="8" autocomplete="new-password" />
+      <button class="btn w-full" type="submit" id="submitBtn">Register</button>
+      <p class="text-sm text-slate-400" id="message"></p>
+    </form>
+    <p class="mt-4 text-sm text-slate-400">
+      Already have an account? <a href="/login" class="text-indigo-400 hover:underline">Login</a>
+    </p>
+  </div>
+  <script define:vars={{ API_BASE }}>
+    const form = document.getElementById("registerForm");
+    const message = document.getElementById("message");
+    const submitBtn = document.getElementById("submitBtn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(form);
+      const data = {
+        name: formData.get("name"),
+        email: formData.get("email"),
+        password: formData.get("password"),
+      };
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creating account...";
+      message.textContent = "";
+      message.className = "text-sm text-slate-400";
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(data),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "Registration failed");
+        window.location.href = `/check-email?email=${encodeURIComponent(data.email)}`;
+      } catch (err) {
+        message.textContent = err.message;
+        message.className = "text-sm text-red-400";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Register";
+      }
+    });
+  </script>
+</Base>

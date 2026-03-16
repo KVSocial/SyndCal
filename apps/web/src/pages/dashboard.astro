@@ -1,0 +1,29 @@
+---
+import Protected from "../layouts/Protected.astro";
+---
+<Protected title="Dashboard">
+  <div class="card">
+    <h1 class="text-2xl font-semibold">All reservations</h1>
+    <div id="list" class="mt-4 space-y-2 text-slate-300"></div>
+  </div>
+  <script type="module">
+    import { api } from "../lib/api.ts";
+    const list = document.getElementById("list");
+    api.dashboard()
+      .then((items) => {
+        list.textContent = "";
+        items.forEach((r) => {
+          const row = document.createElement("div");
+          row.className = "flex justify-between";
+          const title = document.createElement("span");
+          title.textContent = r.title;
+          const syndicate = document.createElement("span");
+          syndicate.textContent = r.syndicate.name;
+          row.appendChild(title);
+          row.appendChild(syndicate);
+          list.appendChild(row);
+        });
+      })
+      .catch(() => (list.textContent = "Login required"));
+  </script>
+</Protected>

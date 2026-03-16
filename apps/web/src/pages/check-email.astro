@@ -1,0 +1,137 @@
+---
+import Base from "../layouts/Base.astro";
+const email = Astro.url.searchParams.get("email") || "your inbox";
+const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
+---
+<Base title="Check Your Email">
+  <div class="max-w-2xl mx-auto">
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-20 h-20 bg-green-500/20 rounded-full mb-4">
+        <svg class="w-10 h-10 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <h1 class="text-3xl font-bold mb-2">Check Your Email!</h1>
+      <p class="text-slate-400">We sent a confirmation link to <span class="text-indigo-400 font-medium">{email}</span></p>
+    </div>
+
+    <div class="card">
+      <h2 class="text-xl font-semibold mb-6">Follow these steps to confirm your account:</h2>
+      
+      <div class="space-y-6">
+        <!-- Step 1 -->
+        <div class="flex gap-4">
+          <div class="flex-shrink-0 w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center font-bold text-sm">1</div>
+          <div class="flex-1">
+            <h3 class="font-semibold mb-1">Go to your inbox now</h3>
+            <p class="text-slate-400 text-sm">Open your email client or webmail</p>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="flex gap-4">
+          <div class="flex-shrink-0 w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center font-bold text-sm">2</div>
+          <div class="flex-1">
+            <h3 class="font-semibold mb-1">Search for the email</h3>
+            <p class="text-slate-400 text-sm mb-3">Look for an email with the subject line:</p>
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-3 font-mono text-sm text-indigo-300">
+              Verify your email
+            </div>
+            <p class="text-slate-500 text-xs mt-2">Sender: noreply@syndcal.kvtechnology.io</p>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="flex gap-4">
+          <div class="flex-shrink-0 w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center font-bold text-sm">3</div>
+          <div class="flex-1">
+            <h3 class="font-semibold mb-1">Turn on images</h3>
+            <p class="text-slate-400 text-sm mb-3">Some email clients block images by default. Look for a button like:</p>
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+              <p class="text-xs text-slate-500 mb-2">Gmail example:</p>
+              <img src="/images/gmail-images.svg" alt="Gmail images button" class="rounded border border-slate-600 max-w-full" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="flex gap-4">
+          <div class="flex-shrink-0 w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center font-bold text-sm">4</div>
+          <div class="flex-1">
+            <h3 class="font-semibold mb-1">Add us to your contacts</h3>
+            <p class="text-slate-400 text-sm mb-3">This ensures future emails land in your inbox, not spam:</p>
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+              <p class="text-xs text-slate-500 mb-2">Add this sender:</p>
+              <div class="flex items-center gap-3 p-2 bg-slate-700/50 rounded">
+                <div class="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold">SC</div>
+                <div>
+                  <p class="font-medium text-sm">SyndCal</p>
+                  <p class="text-xs text-slate-400">noreply@syndcal.kvtechnology.io</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="flex gap-4">
+          <div class="flex-shrink-0 w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center font-bold text-sm">5</div>
+          <div class="flex-1">
+            <h3 class="font-semibold mb-1">Click the confirmation link</h3>
+            <p class="text-slate-400 text-sm mb-3">The email contains a button like this:</p>
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
+              <div class="inline-block bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold">
+                Confirm Your Account
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Help section -->
+      <div class="mt-8 pt-6 border-t border-slate-700">
+        <div class="flex items-start gap-3 text-sm">
+          <svg class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <div>
+            <p class="text-slate-300 font-medium">Can't find the email?</p>
+            <p class="text-slate-400">Check your <strong>Spam</strong> or <strong>Promotions</strong> folder. If it's there, mark it as "Not Spam" and move it to your inbox.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center mt-6 text-slate-400 text-sm">
+      <p>Didn't receive the email? <button id="resendBtn" class="text-indigo-400 hover:underline">Resend verification</button></p>
+      <p class="mt-2"><a href="/login" class="text-indigo-400 hover:underline">Back to login</a></p>
+    </div>
+  </div>
+  <script define:vars={{ API_BASE }}>
+    const resendBtn = document.getElementById("resendBtn");
+    const email = "${email}";
+    
+    resendBtn.addEventListener("click", async () => {
+      resendBtn.disabled = true;
+      resendBtn.textContent = "Sending...";
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/resend-verification`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "Failed to resend");
+        
+        resendBtn.textContent = "Sent! Check your inbox again.";
+        resendBtn.className = "text-green-400";
+      } catch (err) {
+        resendBtn.textContent = "Resend verification";
+        resendBtn.disabled = false;
+        alert(err.message);
+      }
+    });
+  </script>
+</Base>

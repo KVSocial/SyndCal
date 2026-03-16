@@ -1,0 +1,14 @@
+---
+import Protected from "../layouts/Protected.astro";
+---
+<Protected title="Logout">
+  <div class="card">
+    <p id="message">Logging out...</p>
+  </div>
+  <script type="module">
+    import { api } from "../lib/api.ts";
+    api.logout().then(() => {
+      document.getElementById("message").textContent = "Logged out";
+    });
+  </script>
+</Protected>

@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  expired
+}
+
+enum MembershipRole {
+  leader
+  member
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  emailVerifiedAt DateTime?
+  name            String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  memberships           Membership[]
+  invitesCreated        Invite[]               @relation("InvitesCreated")
+  reservations          Reservation[]
+  syndicatesCreated     Syndicate[]
+  emailVerifications    EmailVerification?
+  passwordResets         PasswordReset[]
+  jvzooCredential       JvzooCredential?
+  affiliateTransactions AffiliateTransaction[]
+  refreshTokens         RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Syndicate {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  createdBy             User                   @relation(fields: [createdByUserId], references: [id])
+  memberships           Membership[]
+  invites               Invite[]
+  reservations          Reservation[]
+  settings              SyndicateSetting?
+  affiliateTransactions AffiliateTransaction[]
+}
+
+model Membership {
+  id          String         @id @default(cuid())
+  userId      String
+  syndicateId String
+  role        MembershipRole
+  createdAt   DateTime       @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+  syndicate Syndicate @relation(fields: [syndicateId], references: [id])
+
+  @@unique([userId, syndicateId])
+}
+
+model Invite {
+  id              String       @id @default(cuid())
+  syndicateId     String
+  invitedEmail    String
+  invitedName     String
+  inviteMessage   String
+  tokenHash       String       @unique
+  status          InviteStatus @default(pending)
+  expiresAt       DateTime
+  createdByUserId String
+  createdAt       DateTime     @default(now())
+  acceptedAt      DateTime?
+
+  syndicate Syndicate @relation(fields: [syndicateId], references: [id])
+  createdBy User      @relation("InvitesCreated", fields: [createdByUserId], references: [id])
+}
+
+model EmailVerification {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Reservation {
+  id              String   @id @default(cuid())
+  syndicateId     String
+  createdByUserId String
+  title           String
+  startDate       DateTime
+  endDate         DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  syndicate Syndicate @relation(fields: [syndicateId], references: [id])
+  createdBy User      @relation(fields: [createdByUserId], references: [id])
+
+  @@index([syndicateId, startDate, endDate])
+}
+
+model JvzooCredential {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  encryptedApiKey   String
+  verifiedAt        DateTime?
+  verificationError String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model AffiliateTransaction {
+  id                  String   @id @default(cuid())
+  transactionId       String   @unique
+  userId              String
+  syndicateId         String?
+  date                DateTime
+  productName         String
+  productId           Int
+  status              String
+  price               Decimal
+  affiliateCommission Decimal
+  rawResponse         Json
+  importedAt          DateTime @default(now())
+
+  user      User       @relation(fields: [userId], references: [id])
+  syndicate Syndicate? @relation(fields: [syndicateId], references: [id])
+
+  @@index([userId, date])
+  @@index([syndicateId, date])
+}
+
+model SyndicateSetting {
+  id                String   @id @default(cuid())
+  syndicateId       String   @unique
+  leaderboardMetric String   @default("sales") // 'sales' | 'revenue'
+  showSalesCount    Boolean  @default(true)
+  showRevenue       Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  syndicate Syndicate @relation(fields: [syndicateId], references: [id])
+}
