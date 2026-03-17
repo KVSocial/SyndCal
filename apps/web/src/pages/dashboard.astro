@@ -22,6 +22,12 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
         ...options,
       });
       const data = await res.json();
+      if (res.status === 401) {
+        // Session expired - redirect to login
+        localStorage.removeItem("csrfToken");
+        window.location.href = "/login?expired=1";
+        throw new Error("Session expired");
+      }
       if (!res.ok) throw new Error(data.error || "Request failed");
       return data;
     }
@@ -46,7 +52,9 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
         }
       })
       .catch((e) => {
-        list.innerHTML = '<p class="text-red-400">Error: ' + (e.message || "Login required") + '</p>';
+        if (e.message !== "Session expired") {
+          list.innerHTML = '<p class="text-red-400">Error: ' + (e.message || "Login required") + '</p>';
+        }
       });
   </script>
 </Protected>

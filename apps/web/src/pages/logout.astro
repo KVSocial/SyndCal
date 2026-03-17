@@ -1,14 +1,44 @@
 ---
-import Protected from "../layouts/Protected.astro";
+import Base from "../layouts/Base.astro";
+const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
 ---
-<Protected title="Logout">
+<Base title="Logout">
   <div class="card">
     <p id="message">Logging out...</p>
+    <p class="mt-4"><a href="/login" class="text-indigo-400 hover:underline" id="loginLink" style="display: none;">Go to login</a></p>
   </div>
-  <script type="module">
-    import { api } from "../lib/api.ts";
-    api.logout().then(() => {
-      document.getElementById("message").textContent = "Logged out";
-    });
+  <script define:vars={{ API_BASE }}>
+    const message = document.getElementById("message");
+    const loginLink = document.getElementById("loginLink");
+    const csrfToken = localStorage.getItem("csrfToken");
+
+    async function logout() {
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+        
+        await fetch(`${API_BASE}/api/v1/auth/logout`, {
+          method: "POST",
+          credentials: "include",
+          headers
+        });
+      } catch (e) {
+        console.error("Logout error:", e);
+      }
+      
+      // Clear local storage
+      localStorage.removeItem("csrfToken");
+      
+      // Update UI
+      message.textContent = "Logged out successfully.";
+      loginLink.style.display = "inline";
+      
+      // Redirect to login after 2 seconds
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 2000);
+    }
+
+    logout();
   </script>
-</Protected>
+</Base>
