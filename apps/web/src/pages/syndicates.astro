@@ -1,55 +1,93 @@
 ---
 import Protected from "../layouts/Protected.astro";
+const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
 ---
 <Protected title="Syndicates">
   <section class="grid gap-6 md:grid-cols-2">
     <div class="card">
       <h2 class="text-xl font-semibold">Create syndicate</h2>
-      <form class="mt-4 space-y-3" id="createForm" method="POST" action="#">
-        <input class="input" name="name" placeholder="Name" />
-        <input class="input" name="slug" placeholder="Slug" />
-        <button class="btn w-full" type="submit">Create</button>
+      <form class="mt-4 space-y-3" id="createForm">
+        <input class="input" name="name" placeholder="Name" required />
+        <input class="input" name="slug" placeholder="Slug (e.g., my-syndicate)" required />
+        <button class="btn w-full" type="submit" id="createBtn">Create</button>
         <p class="text-sm text-slate-400" id="createMessage"></p>
       </form>
     </div>
     <div class="card">
       <h2 class="text-xl font-semibold">Your syndicates</h2>
-      <ul class="mt-3 space-y-2" id="syndicateList"></ul>
+      <ul class="mt-3 space-y-2" id="syndicateList">
+        <li class="text-slate-500">Loading...</li>
+      </ul>
     </div>
   </section>
-  <script type="module">
-    import { api } from "../lib/api.ts";
+  <script define:vars={{ API_BASE }}>
     const list = document.getElementById("syndicateList");
     const createForm = document.getElementById("createForm");
     const createMessage = document.getElementById("createMessage");
+    const createBtn = document.getElementById("createBtn");
+    
+    const csrfToken = localStorage.getItem("csrfToken");
+
+    async function request(path, options = {}) {
+      const headers = { "Content-Type": "application/json" };
+      if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+      const res = await fetch(`${API_BASE}${path}`, {
+        credentials: "include",
+        headers,
+        ...options,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+      return data;
+    }
 
     async function load() {
       try {
-        const data = await api.listSyndicates();
+        const data = await request("/api/v1/syndicates");
         list.textContent = "";
-        data.forEach((s) => {
-          const li = document.createElement("li");
-          const link = document.createElement("a");
-          link.className = "text-indigo-300";
-          link.href = `/syndicates/${s.id}`;
-          link.textContent = s.name;
-          li.appendChild(link);
-          list.appendChild(li);
-        });
+        if (data.length === 0) {
+          list.innerHTML = '<li class="text-slate-500">No syndicates yet</li>';
+        } else {
+          data.forEach((s) => {
+            const li = document.createElement("li");
+            const link = document.createElement("a");
+            link.className = "text-indigo-300 hover:underline";
+            link.href = `/syndicates/${s.id}`;
+            link.textContent = s.name;
+            li.appendChild(link);
+            list.appendChild(li);
+          });
+        }
       } catch (e) {
-        list.textContent = "Login required";
+        list.innerHTML = '<li class="text-red-400">Error: ' + (e.message || "Login required") + '</li>';
       }
     }
 
     createForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const data = Object.fromEntries(new FormData(createForm));
+      createBtn.disabled = true;
+      createBtn.textContent = "Creating...";
+      createMessage.textContent = "";
+      createMessage.className = "text-sm text-slate-400";
+      
+      const formData = new FormData(createForm);
+      const data = {
+        name: formData.get("name"),
+        slug: formData.get("slug"),
+      };
+      
       try {
-        await api.createSyndicate(data);
-        createMessage.textContent = "Created";
+        await request("/api/v1/syndicates", { method: "POST", body: JSON.stringify(data) });
+        createMessage.textContent = "Created successfully!";
+        createMessage.className = "text-sm text-green-400";
+        createForm.reset();
         load();
       } catch (err) {
         createMessage.textContent = err.message;
+        createMessage.className = "text-sm text-red-400";
+      } finally {
+        createBtn.disabled = false;
+        createBtn.textContent = "Create";
       }
     });
 

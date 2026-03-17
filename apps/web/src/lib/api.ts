@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:4000";
+export const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
 
 async function request(path: string, options: RequestInit = {}) {
   const csrfToken = typeof document !== "undefined" ? localStorage.getItem("csrfToken") : null;

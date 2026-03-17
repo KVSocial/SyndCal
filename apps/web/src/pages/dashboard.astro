@@ -1,29 +1,52 @@
 ---
 import Protected from "../layouts/Protected.astro";
+const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
 ---
 <Protected title="Dashboard">
   <div class="card">
     <h1 class="text-2xl font-semibold">All reservations</h1>
-    <div id="list" class="mt-4 space-y-2 text-slate-300"></div>
+    <div id="list" class="mt-4 space-y-2 text-slate-300">
+      <p class="text-slate-500">Loading...</p>
+    </div>
   </div>
-  <script type="module">
-    import { api } from "../lib/api.ts";
+  <script define:vars={{ API_BASE }}>
     const list = document.getElementById("list");
-    api.dashboard()
+    const csrfToken = localStorage.getItem("csrfToken");
+
+    async function request(path, options = {}) {
+      const headers = { "Content-Type": "application/json" };
+      if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+      const res = await fetch(`${API_BASE}${path}`, {
+        credentials: "include",
+        headers,
+        ...options,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+      return data;
+    }
+
+    request("/api/v1/dashboard")
       .then((items) => {
         list.textContent = "";
-        items.forEach((r) => {
-          const row = document.createElement("div");
-          row.className = "flex justify-between";
-          const title = document.createElement("span");
-          title.textContent = r.title;
-          const syndicate = document.createElement("span");
-          syndicate.textContent = r.syndicate.name;
-          row.appendChild(title);
-          row.appendChild(syndicate);
-          list.appendChild(row);
-        });
+        if (items.length === 0) {
+          list.innerHTML = '<p class="text-slate-500">No reservations yet</p>';
+        } else {
+          items.forEach((r) => {
+            const row = document.createElement("div");
+            row.className = "flex justify-between";
+            const title = document.createElement("span");
+            title.textContent = r.title;
+            const syndicate = document.createElement("span");
+            syndicate.textContent = r.syndicate?.name || "";
+            row.appendChild(title);
+            row.appendChild(syndicate);
+            list.appendChild(row);
+          });
+        }
       })
-      .catch(() => (list.textContent = "Login required"));
+      .catch((e) => {
+        list.innerHTML = '<p class="text-red-400">Error: ' + (e.message || "Login required") + '</p>';
+      });
   </script>
 </Protected>
