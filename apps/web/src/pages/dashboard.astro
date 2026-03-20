@@ -97,6 +97,56 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
           </form>
         </div>
       </div>
+
+      <!-- Reservation Detail Modal -->
+      <div id="detailModal" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50">
+        <div class="card w-full max-w-md mx-4">
+          <h2 class="text-xl font-semibold mb-4">Reservation Details</h2>
+          <div id="detailContent" class="space-y-3">
+            <!-- Content will be populated -->
+          </div>
+          <div class="flex gap-3 mt-6" id="detailActions">
+            <!-- Actions will be populated -->
+          </div>
+          <div class="flex gap-3 mt-3">
+            <button type="button" id="closeDetailModal" class="btn bg-slate-700 hover:bg-slate-600 flex-1">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Reservation Modal -->
+      <div id="editModal" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50">
+        <div class="card w-full max-w-md mx-4">
+          <h2 class="text-xl font-semibold mb-4">Edit Reservation</h2>
+          <form id="editReservationForm" class="space-y-4">
+            <input type="hidden" id="editReservationId" />
+            
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">Start Date</label>
+              <input type="date" id="editStartDate" class="input" required />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">End Date</label>
+              <input type="date" id="editEndDate" class="input" required />
+            </div>
+
+            <div id="editDateError" class="hidden">
+              <p class="text-sm text-red-400"></p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">Title</label>
+              <input type="text" id="editReservationTitle" class="input" required />
+            </div>
+
+            <div class="flex gap-3">
+              <button type="submit" class="btn flex-1">Save Changes</button>
+              <button type="button" id="cancelEditModal" class="btn bg-slate-700 hover:bg-slate-600 flex-1">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -122,6 +172,23 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
     const syndicateSelectEl = document.getElementById('syndicateSelect');
     const reservationTitleInput = document.getElementById('reservationTitle');
     const cancelModalBtn = document.getElementById('cancelModal');
+    
+    const detailModalEl = document.getElementById('detailModal');
+    const detailContentEl = document.getElementById('detailContent');
+    const detailActionsEl = document.getElementById('detailActions');
+    const closeDetailModalBtn = document.getElementById('closeDetailModal');
+    
+    const editModalEl = document.getElementById('editModal');
+    const editFormEl = document.getElementById('editReservationForm');
+    const editReservationIdInput = document.getElementById('editReservationId');
+    const editStartDateInput = document.getElementById('editStartDate');
+    const editEndDateInput = document.getElementById('editEndDate');
+    const editDateErrorEl = document.getElementById('editDateError');
+    const editDateErrorText = editDateErrorEl.querySelector('p');
+    const editReservationTitleInput = document.getElementById('editReservationTitle');
+    const cancelEditModalBtn = document.getElementById('cancelEditModal');
+    
+    let currentEditReservation = null;
 
     const csrfToken = localStorage.getItem("csrfToken");
 
@@ -225,10 +292,11 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
         dayNumberEl.textContent = day;
         dayEl.appendChild(dayNumberEl);
 
-        // Find reservations for this day
+        // Find reservations that include this day (multi-day support)
         const dayReservations = currentData.reservations.filter(r => {
-          const rDate = new Date(r.startDate).toISOString().split('T')[0];
-          return rDate === dateStr;
+          const start = new Date(r.startDate).toISOString().split('T')[0];
+          const end = new Date(r.endDate).toISOString().split('T')[0];
+          return dateStr >= start && dateStr <= end;
         });
 
         // Render reservations
@@ -237,7 +305,7 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
           const isUserReservation = r.createdById === currentData.user.id;
           
           const resEl = document.createElement('div');
-          resEl.className = `text-xs px-2 py-1 rounded mb-1 truncate ${colorClass} text-white`;
+          resEl.className = `text-xs px-2 py-1 rounded mb-1 truncate ${colorClass} text-white cursor-pointer`;
           resEl.title = `${r.title} (${r.syndicate.name})${isUserReservation ? ' - You' : ''}`;
           resEl.textContent = r.title;
           if (isUserReservation) {
@@ -246,9 +314,19 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
           dayEl.appendChild(resEl);
         });
 
-        // Click to create reservation
+        // Click handler - check if clicking on a reservation or empty day
         dayEl.addEventListener('click', (e) => {
-          if (!e.target.classList.contains('ring-2')) {
+          // Check if clicking on a reservation pill
+          const reservationPill = e.target.closest('.truncate');
+          if (reservationPill) {
+            // Find which reservation this pill represents
+            const pillIndex = Array.from(dayEl.querySelectorAll('.truncate')).indexOf(reservationPill);
+            if (pillIndex >= 0 && dayReservations[pillIndex]) {
+              openDetailModal(dayReservations[pillIndex]);
+              e.stopPropagation();
+            }
+          } else {
+            // Empty day - open create modal
             openCreateModal(dateStr);
           }
         });
@@ -320,6 +398,164 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
     function closeCreateModal() {
       createModalEl.classList.add('hidden');
       createModalEl.classList.remove('flex');
+    }
+
+    function openDetailModal(reservation) {
+      const isOwner = reservation.createdById === currentData.user.id;
+      const startDate = new Date(reservation.startDate).toLocaleDateString('en-US', { 
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+      });
+      const endDate = new Date(reservation.endDate).toLocaleDateString('en-US', { 
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+      });
+      
+      detailContentEl.innerHTML = `
+        <div>
+          <label class="block text-sm font-medium text-slate-400 mb-1">Title</label>
+          <p class="text-slate-200">${reservation.title}</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-400 mb-1">Syndicate</label>
+          <p class="text-slate-200">${reservation.syndicate.name}</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-400 mb-1">Created By</label>
+          <p class="text-slate-200">${reservation.createdBy.name} (${reservation.createdBy.email})</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-400 mb-1">Date Range</label>
+          <p class="text-slate-200">${startDate} → ${endDate}</p>
+        </div>
+      `;
+      
+      // Show actions only if user is the owner
+      if (isOwner) {
+        detailActionsEl.innerHTML = `
+          <button type="button" id="editReservationBtn" class="btn flex-1">Edit</button>
+          <button type="button" id="deleteReservationBtn" class="btn bg-red-600 hover:bg-red-500 flex-1">Delete</button>
+        `;
+        
+        document.getElementById('editReservationBtn').addEventListener('click', () => {
+          openEditModal(reservation);
+        });
+        
+        document.getElementById('deleteReservationBtn').addEventListener('click', async () => {
+          if (confirm('Are you sure you want to delete this reservation?')) {
+            try {
+              await request(`/api/v1/syndicates/${reservation.syndicateId}/reservations/${reservation.id}`, {
+                method: 'DELETE'
+              });
+              closeDetailModal();
+              await loadDashboard();
+            } catch (err) {
+              alert('Error deleting reservation: ' + err.message);
+            }
+          }
+        });
+      } else {
+        detailActionsEl.innerHTML = '';
+      }
+      
+      detailModalEl.classList.remove('hidden');
+      detailModalEl.classList.add('flex');
+    }
+
+    function closeDetailModal() {
+      detailModalEl.classList.add('hidden');
+      detailModalEl.classList.remove('flex');
+    }
+
+    function openEditModal(reservation) {
+      currentEditReservation = reservation;
+      editReservationIdInput.value = reservation.id;
+      
+      const startDate = new Date(reservation.startDate).toISOString().split('T')[0];
+      const endDate = new Date(reservation.endDate).toISOString().split('T')[0];
+      
+      editStartDateInput.value = startDate;
+      editEndDateInput.value = endDate;
+      editReservationTitleInput.value = reservation.title;
+      editDateErrorEl.classList.add('hidden');
+      
+      closeDetailModal();
+      editModalEl.classList.remove('hidden');
+      editModalEl.classList.add('flex');
+    }
+
+    function closeEditModal() {
+      editModalEl.classList.add('hidden');
+      editModalEl.classList.remove('flex');
+      currentEditReservation = null;
+    }
+
+    function validateEditDates() {
+      const startDate = editStartDateInput.value;
+      const endDate = editEndDateInput.value;
+      
+      if (!startDate || !endDate) {
+        return { valid: false, error: 'Please select both start and end dates' };
+      }
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      
+      if (end < start) {
+        return { valid: false, error: 'End date must be after start date' };
+      }
+      
+      const diffTime = end.getTime() - start.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays > 6) {
+        return { valid: false, error: 'Maximum reservation span is 7 days (end date must be within 6 days of start date)' };
+      }
+      
+      return { valid: true, error: null };
+    }
+
+    async function updateReservation(e) {
+      e.preventDefault();
+      
+      if (!currentEditReservation) return;
+      
+      const startDate = editStartDateInput.value;
+      const endDate = editEndDateInput.value;
+      const title = editReservationTitleInput.value;
+      
+      const validation = validateEditDates();
+      if (!validation.valid) {
+        editDateErrorText.textContent = validation.error;
+        editDateErrorEl.classList.remove('hidden');
+        return;
+      }
+      
+      if (!title) {
+        alert('Please fill in the title');
+        return;
+      }
+
+      try {
+        const startDateTime = new Date(startDate);
+        const endDateTime = new Date(endDate);
+        endDateTime.setDate(endDateTime.getDate() + 1);
+
+        await request(`/api/v1/syndicates/${currentEditReservation.syndicateId}/reservations/${currentEditReservation.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            title,
+            startDate: startDateTime.toISOString(),
+            endDate: endDateTime.toISOString()
+          })
+        });
+
+        closeEditModal();
+        await loadDashboard();
+      } catch (err) {
+        alert('Error updating reservation: ' + err.message);
+      }
     }
 
     function validateDates() {
@@ -435,10 +671,13 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
     cancelModalBtn.addEventListener('click', closeCreateModal);
     createFormEl.addEventListener('submit', createReservation);
     
-    // Real-time date validation
+    closeDetailModalBtn.addEventListener('click', closeDetailModal);
+    cancelEditModalBtn.addEventListener('click', closeEditModal);
+    editFormEl.addEventListener('submit', updateReservation);
+    
+    // Real-time date validation for create modal
     startDateInput.addEventListener('change', () => {
       dateErrorEl.classList.add('hidden');
-      // If end date is before new start date, reset end date to start date
       if (endDateInput.value && new Date(endDateInput.value) < new Date(startDateInput.value)) {
         endDateInput.value = startDateInput.value;
       }
@@ -447,11 +686,35 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
     endDateInput.addEventListener('change', () => {
       dateErrorEl.classList.add('hidden');
     });
+    
+    // Real-time date validation for edit modal
+    editStartDateInput.addEventListener('change', () => {
+      editDateErrorEl.classList.add('hidden');
+      if (editEndDateInput.value && new Date(editEndDateInput.value) < new Date(editStartDateInput.value)) {
+        editEndDateInput.value = editStartDateInput.value;
+      }
+    });
+    
+    editEndDateInput.addEventListener('change', () => {
+      editDateErrorEl.classList.add('hidden');
+    });
 
-    // Close modal on outside click
+    // Close modals on outside click
     createModalEl.addEventListener('click', (e) => {
       if (e.target === createModalEl) {
         closeCreateModal();
+      }
+    });
+    
+    detailModalEl.addEventListener('click', (e) => {
+      if (e.target === detailModalEl) {
+        closeDetailModal();
+      }
+    });
+    
+    editModalEl.addEventListener('click', (e) => {
+      if (e.target === editModalEl) {
+        closeEditModal();
       }
     });
 

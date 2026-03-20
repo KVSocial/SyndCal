@@ -61,6 +61,55 @@ export async function reservationRoutes(app: FastifyInstance) {
     reply.send(reservation);
   });
 
+  app.put("/api/v1/syndicates/:id/reservations/:rid", async (req, reply) => {
+    const userId = await requireAuth(app, req);
+    const { id, rid } = z.object({ id: z.string(), rid: z.string() }).parse(req.params);
+    const body = z
+      .object({ title: z.string().min(2), startDate: z.string(), endDate: z.string() })
+      .parse(req.body);
+
+    const membership = await prisma.membership.findFirst({ where: { userId, syndicateId: id } });
+    if (!membership) return reply.code(403).send({ error: "Forbidden" });
+
+    // Verify user owns this reservation
+    const existing = await prisma.reservation.findFirst({
+      where: { id: rid, syndicateId: id, createdByUserId: userId }
+    });
+    if (!existing) return reply.code(403).send({ error: "Forbidden" });
+
+    const start = new Date(body.startDate);
+    const end = new Date(body.endDate);
+
+    if (end < start) return reply.code(400).send({ error: "Invalid date range" });
+    if (daysBetween(start, end) > 7) return reply.code(400).send({ error: "Max 7 days" });
+    const threeMonths = new Date();
+    threeMonths.setMonth(threeMonths.getMonth() + 3);
+    if (start > threeMonths) return reply.code(400).send({ error: "Too far in advance" });
+
+    const reservation = await prisma.$transaction(async (tx) => {
+      // Check for overlaps with other reservations (excluding self)
+      const overlap = await tx.reservation.findFirst({
+        where: {
+          syndicateId: id,
+          id: { not: rid },
+          OR: [{ startDate: { lte: end }, endDate: { gte: start } }],
+        },
+      });
+      if (overlap) throw app.httpErrors.badRequest("Overlap");
+
+      return tx.reservation.update({
+        where: { id: rid },
+        data: {
+          title: body.title,
+          startDate: start,
+          endDate: end,
+        },
+      });
+    });
+
+    reply.send(reservation);
+  });
+
   app.delete("/api/v1/syndicates/:id/reservations/:rid", async (req, reply) => {
     const userId = await requireAuth(app, req);
     const { id, rid } = z.object({ id: z.string(), rid: z.string() }).parse(req.params);
