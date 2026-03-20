@@ -67,6 +67,7 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-1">Start Date</label>
               <input type="date" id="startDate" class="input" required />
+              <p id="startDateMaxError" class="text-sm text-red-400 mt-1 hidden">Start date cannot be more than 3 months in advance</p>
             </div>
 
             <div>
@@ -124,6 +125,7 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-1">Start Date</label>
               <input type="date" id="editStartDate" class="input" required />
+              <p id="editStartDateMaxError" class="text-sm text-red-400 mt-1 hidden">Start date cannot be more than 3 months in advance</p>
             </div>
 
             <div>
@@ -169,6 +171,7 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
     const endDateInput = document.getElementById('endDate');
     const dateErrorEl = document.getElementById('dateError');
     const dateErrorText = dateErrorEl.querySelector('p');
+    const startDateMaxErrorEl = document.getElementById('startDateMaxError');
     const syndicateSelectEl = document.getElementById('syndicateSelect');
     const reservationTitleInput = document.getElementById('reservationTitle');
     const cancelModalBtn = document.getElementById('cancelModal');
@@ -185,10 +188,16 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
     const editEndDateInput = document.getElementById('editEndDate');
     const editDateErrorEl = document.getElementById('editDateError');
     const editDateErrorText = editDateErrorEl.querySelector('p');
+    const editStartDateMaxErrorEl = document.getElementById('editStartDateMaxError');
     const editReservationTitleInput = document.getElementById('editReservationTitle');
     const cancelEditModalBtn = document.getElementById('cancelEditModal');
     
     let currentEditReservation = null;
+
+    // Calculate max date (3 months from today)
+    const maxDate = new Date();
+    maxDate.setMonth(maxDate.getMonth() + 3);
+    const maxDateStr = maxDate.toISOString().split('T')[0];
 
     const csrfToken = localStorage.getItem("csrfToken");
 
@@ -383,8 +392,11 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
       
       selectedDateInput.value = dateStr;
       startDateInput.value = dateStr;
+      startDateInput.max = maxDateStr;
       endDateInput.value = dateStr;
+      endDateInput.max = maxDateStr;
       dateErrorEl.classList.add('hidden');
+      startDateMaxErrorEl.classList.add('hidden');
       reservationTitleInput.value = '';
       
       if (currentData.memberships.length === 1) {
@@ -401,7 +413,7 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
     }
 
     function openDetailModal(reservation) {
-      const isOwner = reservation.createdById === currentData.user.id;
+      const isOwner = reservation.createdBy.id === currentData.user.id;
       const startDate = new Date(reservation.startDate).toLocaleDateString('en-US', { 
         weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
       });
@@ -473,9 +485,12 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
       const endDate = new Date(reservation.endDate).toISOString().split('T')[0];
       
       editStartDateInput.value = startDate;
+      editStartDateInput.max = maxDateStr;
       editEndDateInput.value = endDate;
+      editEndDateInput.max = maxDateStr;
       editReservationTitleInput.value = reservation.title;
       editDateErrorEl.classList.add('hidden');
+      editStartDateMaxErrorEl.classList.add('hidden');
       
       closeDetailModal();
       editModalEl.classList.remove('hidden');
@@ -501,6 +516,15 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
       
       start.setHours(0, 0, 0, 0);
       end.setHours(0, 0, 0, 0);
+      
+      // Check 3-month advance limit
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (start > maxDate) {
+        editStartDateMaxErrorEl.classList.remove('hidden');
+        return { valid: false, error: 'Start date cannot be more than 3 months in advance' };
+      }
+      editStartDateMaxErrorEl.classList.add('hidden');
       
       if (end < start) {
         return { valid: false, error: 'End date must be after start date' };
@@ -572,6 +596,15 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
       // Reset to midnight for accurate comparison
       start.setHours(0, 0, 0, 0);
       end.setHours(0, 0, 0, 0);
+      
+      // Check 3-month advance limit
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (start > maxDate) {
+        startDateMaxErrorEl.classList.remove('hidden');
+        return { valid: false, error: 'Start date cannot be more than 3 months in advance' };
+      }
+      startDateMaxErrorEl.classList.add('hidden');
       
       if (end < start) {
         return { valid: false, error: 'End date must be after start date' };
