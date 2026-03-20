@@ -65,8 +65,17 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
             <input type="hidden" id="selectedDate" />
             
             <div>
-              <label class="block text-sm font-medium text-slate-300 mb-1">Date</label>
-              <input type="date" id="reservationDate" class="input" required />
+              <label class="block text-sm font-medium text-slate-300 mb-1">Start Date</label>
+              <input type="date" id="startDate" class="input" required />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">End Date</label>
+              <input type="date" id="endDate" class="input" required />
+            </div>
+
+            <div id="dateError" class="hidden">
+              <p class="text-sm text-red-400"></p>
             </div>
 
             <div>
@@ -106,7 +115,10 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
     const createModalEl = document.getElementById('createModal');
     const createFormEl = document.getElementById('createReservationForm');
     const selectedDateInput = document.getElementById('selectedDate');
-    const reservationDateInput = document.getElementById('reservationDate');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const dateErrorEl = document.getElementById('dateError');
+    const dateErrorText = dateErrorEl.querySelector('p');
     const syndicateSelectEl = document.getElementById('syndicateSelect');
     const reservationTitleInput = document.getElementById('reservationTitle');
     const cancelModalBtn = document.getElementById('cancelModal');
@@ -292,7 +304,9 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
       }
       
       selectedDateInput.value = dateStr;
-      reservationDateInput.value = dateStr;
+      startDateInput.value = dateStr;
+      endDateInput.value = dateStr;
+      dateErrorEl.classList.add('hidden');
       reservationTitleInput.value = '';
       
       if (currentData.memberships.length === 1) {
@@ -308,29 +322,70 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
       createModalEl.classList.remove('flex');
     }
 
+    function validateDates() {
+      const startDate = startDateInput.value;
+      const endDate = endDateInput.value;
+      
+      if (!startDate || !endDate) {
+        return { valid: false, error: 'Please select both start and end dates' };
+      }
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      // Reset to midnight for accurate comparison
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      
+      if (end < start) {
+        return { valid: false, error: 'End date must be after start date' };
+      }
+      
+      // Calculate difference in days (inclusive)
+      const diffTime = end.getTime() - start.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Max span is 7 days (end - start ≤ 6 days inclusive means 7 days total)
+      if (diffDays > 6) {
+        return { valid: false, error: 'Maximum reservation span is 7 days (end date must be within 6 days of start date)' };
+      }
+      
+      return { valid: true, error: null };
+    }
+
     async function createReservation(e) {
       e.preventDefault();
       
-      const date = reservationDateInput.value;
+      const startDate = startDateInput.value;
+      const endDate = endDateInput.value;
       const syndicateId = syndicateSelectEl.value;
       const title = reservationTitleInput.value;
       
-      if (!date || !syndicateId || !title) {
+      // Validate dates
+      const validation = validateDates();
+      if (!validation.valid) {
+        dateErrorText.textContent = validation.error;
+        dateErrorEl.classList.remove('hidden');
+        return;
+      }
+      
+      if (!syndicateId || !title) {
         alert('Please fill in all fields');
         return;
       }
 
       try {
-        const startDate = new Date(date);
-        const endDate = new Date(date);
-        endDate.setDate(endDate.getDate() + 1);
+        const startDateTime = new Date(startDate);
+        const endDateTime = new Date(endDate);
+        // Add one day to end date to make it exclusive (API expects exclusive end)
+        endDateTime.setDate(endDateTime.getDate() + 1);
 
         await request(`/api/v1/syndicates/${syndicateId}/reservations`, {
           method: 'POST',
           body: JSON.stringify({
             title,
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString()
+            startDate: startDateTime.toISOString(),
+            endDate: endDateTime.toISOString()
           })
         });
 
@@ -379,6 +434,19 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE || "http://localhost:3001";
 
     cancelModalBtn.addEventListener('click', closeCreateModal);
     createFormEl.addEventListener('submit', createReservation);
+    
+    // Real-time date validation
+    startDateInput.addEventListener('change', () => {
+      dateErrorEl.classList.add('hidden');
+      // If end date is before new start date, reset end date to start date
+      if (endDateInput.value && new Date(endDateInput.value) < new Date(startDateInput.value)) {
+        endDateInput.value = startDateInput.value;
+      }
+    });
+    
+    endDateInput.addEventListener('change', () => {
+      dateErrorEl.classList.add('hidden');
+    });
 
     // Close modal on outside click
     createModalEl.addEventListener('click', (e) => {
